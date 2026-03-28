@@ -1,0 +1,29 @@
+[package]
+name = "wsw"
+version = "0.1.0"
+edition = "2021"
+description = "A CLI tool to store and retrieve personal information (who is who)"
+license = "MIT"
+repository = "https://github.com/yourusername/wsw-cli"
+keywords = ["cli", "contacts", "personal", "crm", "sqlite"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "wsw"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+rusqlite = { version = "0.32", features = ["bundled", "chrono"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+anyhow = "1"
+thiserror = "2"
+colored = "2"
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"
