@@ -1,6 +1,6 @@
 # wsw (who is who)
 
-A CLI tool to store and retrieve personal information (who is who) for AI agents and humans.
+A CLI tool to store and retrieve personal information for AI agents and humans.
 
 ## Installation
 
@@ -29,63 +29,76 @@ To remove all data (database file):
 rm ~/.wsw.db
 ```
 
-## Usage
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `wsw [NAME]` | Quick lookup by name |
+| `wsw add <NAME> [FIELD=VALUE]...` | Add a person with optional fields |
+| `wsw get <NAME>` | Show person's details |
+| `wsw set <NAME> <FIELD=VALUE>...` | Update/add fields |
+| `wsw note <NAME> <CONTENT>` | Add a timestamped note |
+| `wsw log <NAME>` | View notes/history |
+| `wsw list` | List all people (supports `--recent`, `--limit`) |
+| `wsw search <QUERY>` | Search (supports `-f <FIELD>` for field-specific) |
+| `wsw rm <NAME>` | Remove person (or `--field <FIELD>` to remove field) |
+
+## Global Options
+
+All commands support these options:
+
+- `--db <PATH>` or `WSW_DB` env var - Custom database path
+- `--json` - JSON output
+- `-y, --yes` - Skip confirmations
+- `--id` - Use ID instead of name (for get/set/note/log/rm)
+
+## Usage Examples
 
 ### Add a person
 
 ```bash
-wsw add "Alex Chen" Job=Engineer Company=TechCorp
-wsw add "Jordan Smith" Title="Product Manager" Department=Growth
+wsw add "Alice" email=alice@example.com role=Engineer github=alice
 ```
 
-### Query a person
+### Quick lookup
 
 ```bash
-# By name (partial match supported)
-wsw "Alex Chen"
-
-# Exact match by ID
-wsw get --id 1
-```
-
-### Update fields
-
-```bash
-wsw set "Alex Chen" Level=L5 Team="Platform"
-wsw set --id 1 Location="San Francisco"
+wsw Alice
 ```
 
 ### Add notes
 
 ```bash
-wsw note "Alex Chen" "Discussed Q3 roadmap, interested in AI features"
-wsw note --id 1 "Follow up on infrastructure proposal"
+wsw note Alice "Met at Rust meetup"
+wsw note Alice "Follow up about project collaboration"
 ```
 
-### Show notes/history
+### View history
 
 ```bash
-wsw log "Alex Chen"
-wsw log --id 1 --limit 10
-```
-
-### List all people
-
-```bash
-wsw list
-wsw list --recent
-wsw list --limit 20
+wsw log Alice
 ```
 
 ### Search
 
 ```bash
 # Search all fields
-wsw search "TechCorp"
+wsw search Engineer
 
 # Search specific field
-wsw search --field Company "TechCorp"
-wsw search --field Job "Engineer"
+wsw search -f role Manager
+```
+
+### Update
+
+```bash
+wsw set Alice twitter=@alice location=SF
+```
+
+### List as JSON
+
+```bash
+wsw list --json
 ```
 
 ### Remove
@@ -98,14 +111,6 @@ wsw rm --id 1 -y
 # Remove just one field
 wsw rm "Alex Chen" --field Location
 wsw rm --id 1 --field Level -y
-```
-
-### JSON output (for LLM agents)
-
-```bash
-wsw "Alex Chen" --json
-wsw list --json
-wsw search "Engineer" --json
 ```
 
 ## Database
@@ -123,22 +128,9 @@ export WSW_DB=/path/to/contacts.db
 wsw list
 ```
 
-## Global Options
+## Data Model
 
-All commands support these options:
-
-- `--db <PATH>` - Use custom database file
-- `--json` - Output as JSON
-- `-y, --yes` - Skip confirmations
-
-## Handling Duplicate Names
-
-When multiple people match a name, use `--id` to specify:
-
-```bash
-wsw set --id 3 Title="Staff Engineer"
-```
-
-## License
-
-MIT
+- SQLite database (default location)
+- Each person: `id`, `name`, `created_at`, `updated_at`
+- Dynamic key-value fields (any FIELD=VALUE pairs)
+- Timestamped notes attached to each person
