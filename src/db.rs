@@ -319,3 +319,198 @@ impl Database {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    fn create_test_db() -> (Database, NamedTempFile) {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db = Database::open(temp_file.path()).unwrap();
+        (db, temp_file)
+    }
+
+    #[test]
+    fn test_add_person() {
+        let (db, _temp) = create_test_db();
+        let mut fields = HashMap::new();
+        fields.insert("email".to_string(), "test@example.com".to_string());
+        fields.insert("role".to_string(), "Developer".to_string());
+
+        let person = db.add_person("Test User", fields.clone()).unwrap();
+        assert_eq!(person.name, "Test User");
+        assert_eq!(person.fields.get("email"), Some(&"test@example.com".to_string()));
+        assert_eq!(person.fields.get("role"), Some(&"Developer".to_string()));
+        assert!(person.id > 0);
+    }
+
+    #[test]
+    fn test_get_person_by_id() {
+        let (db, _temp) = create_test_db();
+        let person = db.add_person("Test User", HashMap::new()).unwrap();
+
+        let retrieved = db.get_person_by_id(person.id).unwrap();
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.name, "Test User");
+        assert_eq!(retrieved.id, person.id);
+    }
+
+    #[test]
+    fn test_get_person_by_id_not_found() {
+        let (db, _temp) = create_test_db();
+        let result = db.get_person_by_id(999).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_find_people_by_name() {
+        let (db, _temp) = create_test_db();
+        db.add_person("Alice Smith", HashMap::new()).unwrap();
+        db.add_person("Alice Jones", HashMap::new()).unwrap();
+        db.add_person("Bob Brown", HashMap::new()).unwrap();
+
+        let results = db.find_people_by_name("Alice").unwrap();
+        assert_eq!(results.len(), 2);
+
+        let results = db.find_people_by_name("Bob").unwrap();
+        assert_eq!(results.len(), 1);
+
+        let results = db.find_people_by_name("Charlie").unwrap();
+        assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_update_person() {
+        let (db, _temp) = create_test_db();
+        let person = db.add_person("Test User", HashMap::new()).unwrap();
+
+        let mut new_fields = HashMap::new();
+        new_fields.insert("email".to_string(), "updated@example.com".to_string());
+
+        let update = PersonUpdate {
+            name: Some("Updated Name".to_string()),
+            fields: new_fields,
+        };
+
+        db.update_person(person.id, update).unwrap();
+
+        let updated = db.get_person_by_id(person.id).unwrap().unwrap();
+        assert_eq!(updated.name, "Updated Name");
+        assert_eq!(updated.fields.get("email"), Some(&"updated@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_delete_person() {
+        let (db, _temp) = create_test_db();
+        let person = db.add_person("Test User", HashMap::new()).unwrap();
+
+        db.delete_person(person.id).unwrap();
+        let result = db.get_person_by_id(person.id).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_delete_person_not_found() {
+        let (db, _temp) = create_test_db();
+        let result = db.delete_person(999);
+        assert!(matches!(result, Err(WswError::NotFound(_))));
+    }
+
+    #[test]
+    fn test_delete_field() {
+        let (db, _temp) = create_test_db();
+        let mut fields = HashMap::new();
+        fields.insert("email".to_string(), "test@example.com".to_string());
+        fields.insert("phone".to_string(), "555-1234".to_string());
+
+        let person = db.add_person("Test User", fields).unwrap();
+        db.delete_field(person.id, "email").unwrap();
+
+        let updated = db.get_person_by_id(person.id).unwrap().unwrap();
+        assert!(updated.fields.get("email").is_none());
+        assert!(updated.fields.get("phone").is_some());
+    }
+
+    #[test]
+    fn test_add_note() {
+        let (db, _temp) = create_test_db();
+        let person = db.add_person("Test User", HashMap::new()).unwrap();
+
+        let note = db.add_note(person.id, "Test note content").unwrap();
+        assert_eq!(note.content, "Test note content");
+        assert_eq!(note.person_id, person.id);
+        assert!(note.id > 0);
+    }
+
+    #[test]
+    fn test_get_notes() {
+        let (db, _temp) = create_test_db();
+        let person = db.add_person("Test User", HashMap::new()).unwrap();
+
+        db.add_note(person.id, "First note").unwrap();
+        db.add_note(person.id, "Second note").unwrap();
+        db.add_note(person.id, "Third note").unwrap();
+
+        let notes = db.get_notes(person.id, 10).unwrap();
+        assert_eq!(notes.len(), 3);
+
+        // Test limit
+        let notes = db.get_notes(person.id, 2).unwrap();
+        assert_eq!(notes.len(), 2);
+    }
+
+    #[test]
+    fn test_list_people() {
+        let (db, _temp) = create_test_db();
+        db.add_person("Charlie", HashMap::new()).unwrap();
+        db.add_person("Alice", HashMap::new()).unwrap();
+        db.add_person("Bob", HashMap::new()).unwrap();
+
+        let people = db.list_people(false, None).unwrap();
+        assert_eq!(people.len(), 3);
+        // Should be sorted by name
+        assert_eq!(people[0].name, "Alice");
+        assert_eq!(people[1].name, "Bob");
+        assert_eq!(people[2].name, "Charlie");
+    }
+
+    #[test]
+    fn test_list_people_with_limit() {
+        let (db, _temp) = create_test_db();
+        db.add_person("Alice", HashMap::new()).unwrap();
+        db.add_person("Bob", HashMap::new()).unwrap();
+        db.add_person("Charlie", HashMap::new()).unwrap();
+
+        let people = db.list_people(false, Some(2)).unwrap();
+        assert_eq!(people.len(), 2);
+    }
+
+    #[test]
+    fn test_search_by_name() {
+        let (db, _temp) = create_test_db();
+        db.add_person("Alice Smith", HashMap::new()).unwrap();
+        db.add_person("Bob Jones", HashMap::new()).unwrap();
+
+        let results = db.search("Smith", None).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "Alice Smith");
+    }
+
+    #[test]
+    fn test_search_by_field() {
+        let (db, _temp) = create_test_db();
+        let mut fields1 = HashMap::new();
+        fields1.insert("role".to_string(), "Developer".to_string());
+        db.add_person("Alice", fields1).unwrap();
+
+        let mut fields2 = HashMap::new();
+        fields2.insert("role".to_string(), "Manager".to_string());
+        db.add_person("Bob", fields2).unwrap();
+
+        let results = db.search("Developer", Some("role")).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "Alice");
+    }
+}

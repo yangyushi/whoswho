@@ -63,3 +63,74 @@ fn display_person(person: &Person, json: bool) {
         println!("(updated on {})", person.updated_at.format("%Y-%m-%d %H:%M"));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use tempfile::NamedTempFile;
+
+    fn create_test_db() -> (Database, NamedTempFile) {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db = Database::open(temp_file.path()).unwrap();
+        (db, temp_file)
+    }
+
+    #[test]
+    fn test_parse_field_valid() {
+        let result = parse_field("key=value").unwrap();
+        assert_eq!(result, ("key".to_string(), "value".to_string()));
+    }
+
+    #[test]
+    fn test_parse_field_with_equals_in_value() {
+        let result = parse_field("key=value=with=equals").unwrap();
+        assert_eq!(result, ("key".to_string(), "value=with=equals".to_string()));
+    }
+
+    #[test]
+    fn test_parse_field_invalid_no_equals() {
+        let result = parse_field("keyvalue");
+        assert!(matches!(result, Err(crate::errors::WswError::InvalidFieldFormat(_))));
+    }
+
+    #[test]
+    fn test_parse_field_empty_value() {
+        let result = parse_field("key=").unwrap();
+        assert_eq!(result, ("key".to_string(), "".to_string()));
+    }
+
+    #[test]
+    fn test_find_person_interactive_by_id() {
+        let (db, _temp) = create_test_db();
+        let person = db.add_person("Test User", std::collections::HashMap::new()).unwrap();
+
+        let result = find_person_interactive(&db, &person.id.to_string(), true).unwrap();
+        assert_eq!(result.name, "Test User");
+        assert_eq!(result.id, person.id);
+    }
+
+    #[test]
+    fn test_find_person_interactive_by_name() {
+        let (db, _temp) = create_test_db();
+        let person = db.add_person("Test User", std::collections::HashMap::new()).unwrap();
+
+        let result = find_person_interactive(&db, "Test", false).unwrap();
+        assert_eq!(result.name, "Test User");
+        assert_eq!(result.id, person.id);
+    }
+
+    #[test]
+    fn test_find_person_interactive_not_found() {
+        let (db, _temp) = create_test_db();
+        let result = find_person_interactive(&db, "NonExistent", false);
+        assert!(matches!(result, Err(crate::errors::WswError::NotFound(_))));
+    }
+
+    #[test]
+    fn test_find_person_interactive_invalid_id() {
+        let (db, _temp) = create_test_db();
+        let result = find_person_interactive(&db, "notanumber", true);
+        assert!(matches!(result, Err(crate::errors::WswError::Other(_))));
+    }
+}
