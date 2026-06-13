@@ -83,7 +83,7 @@ if ($changelogText -notmatch '(?m)^## \[Unreleased\]\s*$') {
     Fail "CHANGELOG.md must contain '## [Unreleased]'"
 }
 
-$releasedHeading = "## [Unreleased]`r`n`r`n## [$Version] - $today"
+$releasedHeading = "## [Unreleased]`n`n## [$Version] - $today`n"
 $changelogText = $changelogText -replace '(?m)^## \[Unreleased\]\s*$', $releasedHeading
 Set-Content -Path $changelog -Value $changelogText -NoNewline
 

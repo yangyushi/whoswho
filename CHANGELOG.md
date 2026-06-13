@@ -6,6 +6,8 @@ The format follows Keep a Changelog, and this project uses Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-13
+
 ### Added
 - `wsw list` shows note counts for each person.
 - `wsw get` and quick lookup print all notes for the selected person.
