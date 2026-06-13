@@ -1,4 +1,4 @@
-use crate::errors::{WswError, Result};
+use crate::errors::{Result, WswError};
 use crate::models::{Note, Person, PersonUpdate};
 use chrono::Local;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -74,19 +74,21 @@ impl Database {
     }
 
     pub fn get_person_by_id(&self, id: i64) -> Result<Option<Person>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, name, fields, created_at, updated_at FROM people WHERE id = ?1"
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name, fields, created_at, updated_at FROM people WHERE id = ?1")?;
 
         let person = stmt
             .query_row([id], |row| {
                 let fields_json: String = row.get(2)?;
-                let fields: HashMap<String, String> = serde_json::from_str(&fields_json)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                        2,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    ))?;
+                let fields: HashMap<String, String> =
+                    serde_json::from_str(&fields_json).map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            2,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
 
                 Ok(Person {
                     id: row.get(0)?,
@@ -109,12 +111,14 @@ impl Database {
         let pattern = format!("%{}%", name);
         let rows = stmt.query_map([pattern], |row| {
             let fields_json: String = row.get(2)?;
-            let fields: HashMap<String, String> = serde_json::from_str(&fields_json)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                    2,
-                    rusqlite::types::Type::Text,
-                    Box::new(e),
-                ))?;
+            let fields: HashMap<String, String> =
+                serde_json::from_str(&fields_json).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        2,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
 
             Ok(Person {
                 id: row.get(0)?,
@@ -137,7 +141,9 @@ impl Database {
             let mut fields = person.fields;
 
             if let Some(new_name) = update.name {
-                let mut stmt = self.conn.prepare("UPDATE people SET name = ?1, updated_at = ?2 WHERE id = ?3")?;
+                let mut stmt = self
+                    .conn
+                    .prepare("UPDATE people SET name = ?1, updated_at = ?2 WHERE id = ?3")?;
                 stmt.execute(params![new_name, Local::now(), id])?;
             }
 
@@ -146,7 +152,9 @@ impl Database {
             }
 
             let fields_json = serde_json::to_string(&fields)?;
-            let mut stmt = self.conn.prepare("UPDATE people SET fields = ?1, updated_at = ?2 WHERE id = ?3")?;
+            let mut stmt = self
+                .conn
+                .prepare("UPDATE people SET fields = ?1, updated_at = ?2 WHERE id = ?3")?;
             stmt.execute(params![fields_json, Local::now(), id])?;
 
             Ok(())
@@ -156,7 +164,9 @@ impl Database {
     }
 
     pub fn delete_person(&self, id: i64) -> Result<()> {
-        let rows = self.conn.execute("DELETE FROM people WHERE id = ?1", [id])?;
+        let rows = self
+            .conn
+            .execute("DELETE FROM people WHERE id = ?1", [id])?;
         if rows == 0 {
             Err(WswError::NotFound(format!("ID {}", id)))
         } else {
@@ -186,6 +196,10 @@ impl Database {
             "INSERT INTO notes (person_id, content, created_at) VALUES (?1, ?2, ?3)",
             params![person_id, content, now],
         )?;
+        self.conn.execute(
+            "UPDATE people SET updated_at = ?1 WHERE id = ?2",
+            params![now, person_id],
+        )?;
 
         let id = self.conn.last_insert_rowid();
 
@@ -195,6 +209,36 @@ impl Database {
             content: content.to_string(),
             created_at: now,
         })
+    }
+
+    pub fn count_notes(&self, person_id: i64) -> Result<usize> {
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM notes WHERE person_id = ?1",
+            [person_id],
+            |row| row.get(0),
+        )?;
+        Ok(count as usize)
+    }
+
+    pub fn get_all_notes(&self, person_id: i64) -> Result<Vec<Note>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, person_id, content, created_at FROM notes WHERE person_id = ?1 ORDER BY created_at DESC"
+        )?;
+
+        let rows = stmt.query_map([person_id], |row| {
+            Ok(Note {
+                id: row.get(0)?,
+                person_id: row.get(1)?,
+                content: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+
+        let mut notes = Vec::new();
+        for row in rows {
+            notes.push(row?);
+        }
+        Ok(notes)
     }
 
     pub fn get_notes(&self, person_id: i64, limit: usize) -> Result<Vec<Note>> {
@@ -231,12 +275,14 @@ impl Database {
 
         let rows = stmt.query_map([], |row| {
             let fields_json: String = row.get(2)?;
-            let fields: HashMap<String, String> = serde_json::from_str(&fields_json)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                    2,
-                    rusqlite::types::Type::Text,
-                    Box::new(e),
-                ))?;
+            let fields: HashMap<String, String> =
+                serde_json::from_str(&fields_json).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        2,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
 
             Ok(Person {
                 id: row.get(0)?,
@@ -256,6 +302,42 @@ impl Database {
 
     pub fn search(&self, query: &str, field: Option<&str>) -> Result<Vec<Person>> {
         if let Some(field_name) = field {
+            if field_name.eq_ignore_ascii_case("note") || field_name.eq_ignore_ascii_case("notes") {
+                let mut stmt = self.conn.prepare(
+                    "SELECT id, name, fields, created_at, updated_at FROM people WHERE id IN (
+                        SELECT person_id FROM notes WHERE content LIKE ?1
+                    ) ORDER BY name",
+                )?;
+
+                let pattern = format!("%{}%", query);
+
+                let rows = stmt.query_map([pattern], |row| {
+                    let fields_json: String = row.get(2)?;
+                    let fields: HashMap<String, String> = serde_json::from_str(&fields_json)
+                        .map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                2,
+                                rusqlite::types::Type::Text,
+                                Box::new(e),
+                            )
+                        })?;
+
+                    Ok(Person {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        fields,
+                        created_at: row.get(3)?,
+                        updated_at: row.get(4)?,
+                    })
+                })?;
+
+                let mut people = Vec::new();
+                for row in rows {
+                    people.push(row?);
+                }
+                return Ok(people);
+            }
+
             let mut stmt = self.conn.prepare(
                 "SELECT id, name, fields, created_at, updated_at FROM people WHERE json_extract(fields, ?1) LIKE ?2 ORDER BY name"
             )?;
@@ -265,12 +347,14 @@ impl Database {
 
             let rows = stmt.query_map(params![json_path, pattern], |row| {
                 let fields_json: String = row.get(2)?;
-                let fields: HashMap<String, String> = serde_json::from_str(&fields_json)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                        2,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    ))?;
+                let fields: HashMap<String, String> =
+                    serde_json::from_str(&fields_json).map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            2,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
 
                 Ok(Person {
                     id: row.get(0)?,
@@ -288,19 +372,25 @@ impl Database {
             Ok(people)
         } else {
             let mut stmt = self.conn.prepare(
-                "SELECT id, name, fields, created_at, updated_at FROM people WHERE name LIKE ?1 OR fields LIKE ?2 ORDER BY name"
+                "SELECT id, name, fields, created_at, updated_at FROM people WHERE
+                    name LIKE ?1
+                    OR fields LIKE ?2
+                    OR id IN (SELECT person_id FROM notes WHERE content LIKE ?3)
+                 ORDER BY name",
             )?;
 
             let pattern = format!("%{}%", query);
 
-            let rows = stmt.query_map(params![pattern, pattern], |row| {
+            let rows = stmt.query_map(params![pattern, pattern, pattern], |row| {
                 let fields_json: String = row.get(2)?;
-                let fields: HashMap<String, String> = serde_json::from_str(&fields_json)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                        2,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    ))?;
+                let fields: HashMap<String, String> =
+                    serde_json::from_str(&fields_json).map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            2,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
 
                 Ok(Person {
                     id: row.get(0)?,
@@ -317,6 +407,30 @@ impl Database {
             }
             Ok(people)
         }
+    }
+
+    pub fn search_notes_for_person(&self, person_id: i64, query: &str) -> Result<Vec<Note>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, person_id, content, created_at FROM notes
+             WHERE person_id = ?1 AND content LIKE ?2
+             ORDER BY created_at DESC",
+        )?;
+
+        let pattern = format!("%{}%", query);
+        let rows = stmt.query_map(params![person_id, pattern], |row| {
+            Ok(Note {
+                id: row.get(0)?,
+                person_id: row.get(1)?,
+                content: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+
+        let mut notes = Vec::new();
+        for row in rows {
+            notes.push(row?);
+        }
+        Ok(notes)
     }
 }
 
@@ -340,7 +454,10 @@ mod tests {
 
         let person = db.add_person("Test User", fields.clone()).unwrap();
         assert_eq!(person.name, "Test User");
-        assert_eq!(person.fields.get("email"), Some(&"test@example.com".to_string()));
+        assert_eq!(
+            person.fields.get("email"),
+            Some(&"test@example.com".to_string())
+        );
         assert_eq!(person.fields.get("role"), Some(&"Developer".to_string()));
         assert!(person.id > 0);
     }
@@ -398,7 +515,10 @@ mod tests {
 
         let updated = db.get_person_by_id(person.id).unwrap().unwrap();
         assert_eq!(updated.name, "Updated Name");
-        assert_eq!(updated.fields.get("email"), Some(&"updated@example.com".to_string()));
+        assert_eq!(
+            updated.fields.get("email"),
+            Some(&"updated@example.com".to_string())
+        );
     }
 
     #[test]

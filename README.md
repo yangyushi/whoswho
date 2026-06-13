@@ -35,12 +35,12 @@ rm ~/.wsw.db
 |---------|-------------|
 | `wsw [NAME]` | Quick lookup by name |
 | `wsw add <NAME> [FIELD=VALUE]...` | Add a person with optional fields |
-| `wsw get <NAME>` | Show person's details |
+| `wsw get <NAME>` | Show person's details and notes |
 | `wsw set <NAME> <FIELD=VALUE>...` | Update/add fields |
 | `wsw note <NAME> <CONTENT>` | Add a timestamped note |
 | `wsw log <NAME>` | View notes/history |
-| `wsw list` | List all people (supports `--recent`, `--limit`) |
-| `wsw search <QUERY>` | Search (supports `-f <FIELD>` for field-specific) |
+| `wsw list` | List all people with note counts (supports `--recent`, `--limit`) |
+| `wsw search <QUERY>` | Search names, fields, and notes (supports `-f <FIELD>` and `-f notes`) |
 | `wsw rm <NAME>` | Remove person (or `--field <FIELD>` to remove field) |
 
 ## Global Options
@@ -66,6 +66,8 @@ wsw add "Alice" email=alice@example.com role=Engineer github=alice
 wsw Alice
 ```
 
+Quick lookup also prints that person's notes.
+
 ### Add notes
 
 ```bash
@@ -85,8 +87,14 @@ wsw log Alice
 # Search all fields
 wsw search Engineer
 
+# Search notes too
+wsw search "project collaboration"
+
 # Search specific field
 wsw search -f role Manager
+
+# Search only notes
+wsw search -f notes "follow up"
 ```
 
 ### Update

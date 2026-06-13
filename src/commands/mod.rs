@@ -9,16 +9,16 @@ pub mod set;
 
 use crate::db::Database;
 use crate::errors::Result;
-use crate::models::Person;
+use crate::models::{Note, Person};
+use serde::Serialize;
 
 fn find_person_interactive(db: &Database, name: &str, use_id: bool) -> Result<Person> {
     if use_id {
-        let id: i64 = name.parse().map_err(|_| {
-            crate::errors::WswError::Other(format!("'{}' is not a valid ID", name))
-        })?;
-        db.get_person_by_id(id)?.ok_or_else(|| {
-            crate::errors::WswError::NotFound(format!("ID {}", id))
-        })
+        let id: i64 = name
+            .parse()
+            .map_err(|_| crate::errors::WswError::Other(format!("'{}' is not a valid ID", name)))?;
+        db.get_person_by_id(id)?
+            .ok_or_else(|| crate::errors::WswError::NotFound(format!("ID {}", id)))
     } else {
         let people = db.find_people_by_name(name)?;
         match people.len() {
@@ -27,7 +27,12 @@ fn find_person_interactive(db: &Database, name: &str, use_id: bool) -> Result<Pe
             _ => {
                 eprintln!("Multiple people found matching '{}':", name);
                 for person in &people {
-                    eprintln!("  [{}] {} ({})", person.id, person.name, person.updated_at.format("%Y-%m-%d"));
+                    eprintln!(
+                        "  [{}] {} ({})",
+                        person.id,
+                        person.name,
+                        person.updated_at.format("%Y-%m-%d")
+                    );
                 }
                 eprintln!("\nUse --id to specify which one to use.");
                 Err(crate::errors::WswError::MultipleMatches(name.to_string()))
@@ -39,28 +44,59 @@ fn find_person_interactive(db: &Database, name: &str, use_id: bool) -> Result<Pe
 fn parse_field(field: &str) -> Result<(String, String)> {
     let parts: Vec<&str> = field.splitn(2, '=').collect();
     if parts.len() != 2 {
-        return Err(crate::errors::WswError::InvalidFieldFormat(field.to_string()));
+        return Err(crate::errors::WswError::InvalidFieldFormat(
+            field.to_string(),
+        ));
     }
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
-fn display_person(person: &Person, json: bool) {
+fn display_person(person: &Person, notes: &[Note], json: bool) {
     if json {
-        println!("{}", serde_json::to_string_pretty(person).unwrap());
-    } else {
-        // Calculate max key length for alignment
-        let mut all_keys: Vec<&str> = vec!["Name"];
-        for key in person.fields.keys() {
-            all_keys.push(key);
+        #[derive(Serialize)]
+        struct PersonDetails<'a> {
+            #[serde(flatten)]
+            person: &'a Person,
+            notes: &'a [Note],
         }
+
+        let details = PersonDetails { person, notes };
+        println!("{}", serde_json::to_string_pretty(&details).unwrap());
+    } else {
+        let mut fields: Vec<(&String, &String)> = person.fields.iter().collect();
+        fields.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+        let mut all_keys: Vec<&str> = vec!["ID", "Name"];
+        all_keys.extend(fields.iter().map(|(key, _)| key.as_str()));
         let max_len = all_keys.iter().map(|k| k.len()).max().unwrap_or(4);
 
-        // Print with alignment
+        println!("{:width$} {}", "ID:", person.id, width = max_len + 1);
         println!("{:width$} {}", "Name:", person.name, width = max_len + 1);
-        for (key, value) in &person.fields {
-            println!("{:width$} {}", format!("{}:", key), value, width = max_len + 1);
+        for (key, value) in fields {
+            println!(
+                "{:width$} {}",
+                format!("{}:", key),
+                value,
+                width = max_len + 1
+            );
         }
-        println!("(updated on {})", person.updated_at.format("%Y-%m-%d %H:%M"));
+        println!(
+            "(updated on {})",
+            person.updated_at.format("%Y-%m-%d %H:%M")
+        );
+
+        println!("\nNotes:");
+        if notes.is_empty() {
+            println!("  (no notes yet)");
+        } else {
+            for note in notes {
+                println!(
+                    "  [{}] {}",
+                    note.created_at.format("%Y-%m-%d %H:%M"),
+                    note.content
+                );
+            }
+        }
     }
 }
 
@@ -91,7 +127,10 @@ mod tests {
     #[test]
     fn test_parse_field_invalid_no_equals() {
         let result = parse_field("keyvalue");
-        assert!(matches!(result, Err(crate::errors::WswError::InvalidFieldFormat(_))));
+        assert!(matches!(
+            result,
+            Err(crate::errors::WswError::InvalidFieldFormat(_))
+        ));
     }
 
     #[test]
@@ -103,7 +142,9 @@ mod tests {
     #[test]
     fn test_find_person_interactive_by_id() {
         let (db, _temp) = create_test_db();
-        let person = db.add_person("Test User", std::collections::HashMap::new()).unwrap();
+        let person = db
+            .add_person("Test User", std::collections::HashMap::new())
+            .unwrap();
 
         let result = find_person_interactive(&db, &person.id.to_string(), true).unwrap();
         assert_eq!(result.name, "Test User");
@@ -113,7 +154,9 @@ mod tests {
     #[test]
     fn test_find_person_interactive_by_name() {
         let (db, _temp) = create_test_db();
-        let person = db.add_person("Test User", std::collections::HashMap::new()).unwrap();
+        let person = db
+            .add_person("Test User", std::collections::HashMap::new())
+            .unwrap();
 
         let result = find_person_interactive(&db, "Test", false).unwrap();
         assert_eq!(result.name, "Test User");

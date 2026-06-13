@@ -15,7 +15,10 @@ pub fn run(db: &Database, name: String, use_id: bool, limit: usize) -> Result<()
         for note in notes {
             println!(
                 "  [{}] {}",
-                note.created_at.format("%Y-%m-%d %H:%M").to_string().dimmed(),
+                note.created_at
+                    .format("%Y-%m-%d %H:%M")
+                    .to_string()
+                    .dimmed(),
                 note.content
             );
         }

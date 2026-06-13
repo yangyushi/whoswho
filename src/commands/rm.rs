@@ -3,7 +3,13 @@ use crate::db::Database;
 use crate::errors::Result;
 use std::io::{self, Write};
 
-pub fn run(db: &Database, name: String, field: Option<String>, use_id: bool, yes: bool) -> Result<()> {
+pub fn run(
+    db: &Database,
+    name: String,
+    field: Option<String>,
+    use_id: bool,
+    yes: bool,
+) -> Result<()> {
     let person = find_person_interactive(db, &name, use_id)?;
 
     if let Some(field_name) = field {

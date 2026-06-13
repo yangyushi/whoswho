@@ -24,9 +24,9 @@ fn test_cli_no_args_shows_help() {
 fn test_cli_help_flag() {
     let mut cmd = wsw_cmd();
     cmd.arg("--help");
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains("Store and retrieve personal information"));
+    cmd.assert().success().stdout(predicate::str::contains(
+        "Store and retrieve personal information",
+    ));
 }
 
 #[test]
@@ -42,7 +42,14 @@ fn test_cli_version_flag() {
 fn test_add_person() {
     let (db_path, _temp) = temp_db_arg();
     let mut cmd = wsw_cmd();
-    cmd.args(["--db", &db_path, "add", "Test User", "email=test@example.com", "role=Developer"]);
+    cmd.args([
+        "--db",
+        &db_path,
+        "add",
+        "Test User",
+        "email=test@example.com",
+        "role=Developer",
+    ]);
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Added: Test User"))
@@ -55,7 +62,14 @@ fn test_add_and_get_person() {
 
     // Add person
     let mut cmd = wsw_cmd();
-    cmd.args(["--db", &db_path, "add", "Alice Smith", "email=alice@example.com", "role=Engineer"]);
+    cmd.args([
+        "--db",
+        &db_path,
+        "add",
+        "Alice Smith",
+        "email=alice@example.com",
+        "role=Engineer",
+    ]);
     cmd.assert().success();
 
     // Get person
@@ -96,7 +110,14 @@ fn test_set_person() {
 
     // Update person
     let mut cmd = wsw_cmd();
-    cmd.args(["--db", &db_path, "set", "Charlie", "email=new@example.com", "github=charlie"]);
+    cmd.args([
+        "--db",
+        &db_path,
+        "set",
+        "Charlie",
+        "email=new@example.com",
+        "github=charlie",
+    ]);
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Updated: Charlie"));
@@ -130,6 +151,30 @@ fn test_list_people() {
         .success()
         .stdout(predicate::str::contains("Alice"))
         .stdout(predicate::str::contains("Bob"));
+}
+
+#[test]
+fn test_list_shows_note_counts() {
+    let (db_path, _temp) = temp_db_arg();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "add", "Alice"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "note", "Alice", "First note"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "note", "Alice", "Second note"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "list"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Alice"))
+        .stdout(predicate::str::contains("2 notes"));
 }
 
 #[test]
@@ -179,11 +224,25 @@ fn test_search_by_field() {
 
     // Add people
     let mut cmd = wsw_cmd();
-    cmd.args(["--db", &db_path, "add", "Alice", "role=Engineer", "team=Platform"]);
+    cmd.args([
+        "--db",
+        &db_path,
+        "add",
+        "Alice",
+        "role=Engineer",
+        "team=Platform",
+    ]);
     cmd.assert().success();
 
     let mut cmd = wsw_cmd();
-    cmd.args(["--db", &db_path, "add", "Bob", "role=Manager", "team=Growth"]);
+    cmd.args([
+        "--db",
+        &db_path,
+        "add",
+        "Bob",
+        "role=Manager",
+        "team=Growth",
+    ]);
     cmd.assert().success();
 
     // Search by field
@@ -193,6 +252,63 @@ fn test_search_by_field() {
         .success()
         .stdout(predicate::str::contains("Alice"))
         .stdout(predicate::str::contains("Found 1 match"));
+}
+
+#[test]
+fn test_search_finds_note_content() {
+    let (db_path, _temp) = temp_db_arg();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "add", "Alice"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args([
+        "--db",
+        &db_path,
+        "note",
+        "Alice",
+        "Discuss vector database rollout",
+    ]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "search", "vector"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Alice"))
+        .stdout(predicate::str::contains("Discuss vector database rollout"));
+}
+
+#[test]
+fn test_search_by_note_field() {
+    let (db_path, _temp) = temp_db_arg();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "add", "Alice", "role=Engineer"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "add", "Bob", "role=vector"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args([
+        "--db",
+        &db_path,
+        "note",
+        "Alice",
+        "Discuss vector database rollout",
+    ]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "search", "-f", "notes", "vector"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Alice"))
+        .stdout(predicate::str::contains("Discuss vector database rollout"))
+        .stdout(predicate::str::contains("Bob").not());
 }
 
 #[test]
@@ -217,6 +333,32 @@ fn test_note_and_log() {
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("This is a test note"));
+}
+
+#[test]
+fn test_get_includes_notes() {
+    let (db_path, _temp) = temp_db_arg();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "add", "Note Detail Test"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args([
+        "--db",
+        &db_path,
+        "note",
+        "Note Detail Test",
+        "Visible from get",
+    ]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "get", "Note Detail Test"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Notes:"))
+        .stdout(predicate::str::contains("Visible from get"));
 }
 
 #[test]
@@ -249,12 +391,27 @@ fn test_rm_field() {
 
     // Add person with fields
     let mut cmd = wsw_cmd();
-    cmd.args(["--db", &db_path, "add", "Field Test", "email=test@example.com", "phone=555-1234"]);
+    cmd.args([
+        "--db",
+        &db_path,
+        "add",
+        "Field Test",
+        "email=test@example.com",
+        "phone=555-1234",
+    ]);
     cmd.assert().success();
 
     // Remove field with -y flag
     let mut cmd = wsw_cmd();
-    cmd.args(["--db", &db_path, "rm", "Field Test", "--field", "email", "-y"]);
+    cmd.args([
+        "--db",
+        &db_path,
+        "rm",
+        "Field Test",
+        "--field",
+        "email",
+        "-y",
+    ]);
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Removed field"));
@@ -319,7 +476,7 @@ fn test_invalid_field_format() {
 
     let mut cmd = wsw_cmd();
     cmd.args(["--db", &db_path, "add", "Test", "invalidfield"]);
-    cmd.assert()
-        .failure()
-        .stderr(predicate::str::contains("Invalid field format").or(predicate::str::contains("Error:")));
+    cmd.assert().failure().stderr(
+        predicate::str::contains("Invalid field format").or(predicate::str::contains("Error:")),
+    );
 }
