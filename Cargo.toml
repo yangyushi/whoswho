@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "A CLI tool to store and retrieve personal information (who is who)"
 license = "MIT"
-repository = "https://github.com/yourusername/wsw-cli"
+repository = "https://github.com/yangyushi/whoswho"
 keywords = ["cli", "contacts", "personal", "crm", "sqlite"]
 categories = ["command-line-utilities"]
 
