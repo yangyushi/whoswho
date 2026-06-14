@@ -6,6 +6,9 @@ The format follows Keep a Changelog, and this project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+- CLI help and README option documentation now only advertise options that each command actually uses.
+
 ## [0.2.0] - 2026-06-13
 
 ### Added

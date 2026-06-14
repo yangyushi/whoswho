@@ -30,6 +30,39 @@ fn test_cli_help_flag() {
 }
 
 #[test]
+fn test_command_help_only_shows_applicable_options() {
+    let mut cmd = wsw_cmd();
+    cmd.args(["list", "--help"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("[NAME]").not())
+        .stdout(predicate::str::contains("--json"))
+        .stdout(predicate::str::contains("--yes").not());
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["search", "--help"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("[NAME]").not())
+        .stdout(predicate::str::contains("--json"))
+        .stdout(predicate::str::contains("--yes").not());
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["note", "--help"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("--json").not())
+        .stdout(predicate::str::contains("--yes").not());
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["rm", "--help"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("--yes"))
+        .stdout(predicate::str::contains("--json").not());
+}
+
+#[test]
 fn test_cli_version_flag() {
     let mut cmd = wsw_cmd();
     cmd.arg("--version");
@@ -194,6 +227,44 @@ fn test_list_json_output() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("\"id\":"))
         .stdout(predicate::str::contains("JSON Test"));
+}
+
+#[test]
+fn test_root_json_applies_to_json_capable_commands() {
+    let (db_path, _temp) = temp_db_arg();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "add", "Root JSON Test"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "--json", "list"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("\"name\":"))
+        .stdout(predicate::str::contains("Root JSON Test"));
+}
+
+#[test]
+fn test_root_json_rejects_non_json_commands() {
+    let (db_path, _temp) = temp_db_arg();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "add", "Root JSON Reject Test"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args([
+        "--db",
+        &db_path,
+        "--json",
+        "note",
+        "Root JSON Reject Test",
+        "note",
+    ]);
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "--json is only supported for quick lookup, get, list, and search",
+    ));
 }
 
 #[test]

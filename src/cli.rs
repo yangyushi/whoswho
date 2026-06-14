@@ -10,7 +10,7 @@ pub struct Cli {
     pub command: Option<Commands>,
 
     /// Name to query (when no subcommand provided)
-    #[arg(value_name = "NAME", global = true)]
+    #[arg(value_name = "NAME")]
     pub name: Option<String>,
 
     /// Path to database file
@@ -18,12 +18,8 @@ pub struct Cli {
     pub db: Option<PathBuf>,
 
     /// Output as JSON
-    #[arg(long, global = true)]
+    #[arg(long)]
     pub json: bool,
-
-    /// Skip confirmations
-    #[arg(short, long, global = true)]
-    pub yes: bool,
 }
 
 #[derive(Subcommand)]
@@ -36,6 +32,10 @@ pub enum Commands {
         /// Get by ID instead of name
         #[arg(long)]
         id: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Add a new person
@@ -98,6 +98,10 @@ pub enum Commands {
         /// Limit number of results
         #[arg(short, long)]
         limit: Option<usize>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Search for people
@@ -108,6 +112,10 @@ pub enum Commands {
         /// Search specific field
         #[arg(short, long, value_name = "FIELD")]
         field: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Remove a person or field
@@ -122,5 +130,9 @@ pub enum Commands {
         /// Use ID instead of name
         #[arg(long)]
         id: bool,
+
+        /// Skip confirmation
+        #[arg(short, long)]
+        yes: bool,
     },
 }

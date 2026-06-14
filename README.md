@@ -43,14 +43,21 @@ rm ~/.wsw.db
 | `wsw search <QUERY>` | Search names, fields, and notes (supports `-f <FIELD>` and `-f notes`) |
 | `wsw rm <NAME>` | Remove person (or `--field <FIELD>` to remove field) |
 
-## Global Options
+## Options
 
-All commands support these options:
+All commands support:
 
 - `--db <PATH>` or `WSW_DB` env var - Custom database path
-- `--json` - JSON output
-- `-y, --yes` - Skip confirmations
-- `--id` - Use ID instead of name (for get/set/note/log/rm)
+
+Quick lookup supports:
+
+- `--json` - JSON output, for example `wsw --json Alice`
+
+Command-specific options:
+
+- `--json` - JSON output for `get`, `list`, and `search`; it may appear before or after those subcommands
+- `--id` - Use ID instead of name for `get`, `set`, `note`, `log`, and `rm`
+- `-y, --yes` - Skip confirmation for `rm`
 
 ## Usage Examples
 

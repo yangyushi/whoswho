@@ -6,7 +6,7 @@ mod models;
 
 use crate::cli::{Cli, Commands};
 use crate::db::Database;
-use crate::errors::Result;
+use crate::errors::{Result, WswError};
 use clap::{CommandFactory, Parser};
 use std::path::PathBuf;
 
@@ -25,29 +25,43 @@ fn run() -> Result<()> {
     let db = Database::open(&db_path)?;
 
     match cli.command {
-        Some(Commands::Get { name, id }) => {
-            commands::get::run(&db, name, id, cli.json)?;
+        Some(Commands::Get { name, id, json }) => {
+            commands::get::run(&db, name, id, json || cli.json)?;
         }
         Some(Commands::Add { name, fields }) => {
+            reject_root_json(cli.json)?;
             commands::add::run(&db, name, fields)?;
         }
         Some(Commands::Set { name, fields, id }) => {
+            reject_root_json(cli.json)?;
             commands::set::run(&db, name, fields, id)?;
         }
         Some(Commands::Note { name, content, id }) => {
+            reject_root_json(cli.json)?;
             commands::note::run(&db, name, content, id)?;
         }
         Some(Commands::Log { name, id, limit }) => {
+            reject_root_json(cli.json)?;
             commands::log::run(&db, name, id, limit)?;
         }
-        Some(Commands::List { recent, limit }) => {
-            commands::list::run(&db, recent, limit, cli.json)?;
+        Some(Commands::List {
+            recent,
+            limit,
+            json,
+        }) => {
+            commands::list::run(&db, recent, limit, json || cli.json)?;
         }
-        Some(Commands::Search { query, field }) => {
-            commands::search::run(&db, query, field, cli.json)?;
+        Some(Commands::Search { query, field, json }) => {
+            commands::search::run(&db, query, field, json || cli.json)?;
         }
-        Some(Commands::Rm { name, field, id }) => {
-            commands::rm::run(&db, name, field, id, cli.yes)?;
+        Some(Commands::Rm {
+            name,
+            field,
+            id,
+            yes,
+        }) => {
+            reject_root_json(cli.json)?;
+            commands::rm::run(&db, name, field, id, yes)?;
         }
         None => {
             if let Some(name) = cli.name {
@@ -61,6 +75,16 @@ fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn reject_root_json(json: bool) -> Result<()> {
+    if json {
+        Err(WswError::Other(
+            "--json is only supported for quick lookup, get, list, and search".to_string(),
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 fn main() {
