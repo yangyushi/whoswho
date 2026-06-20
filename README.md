@@ -149,3 +149,8 @@ wsw list
 - Each person: `id`, `name`, `created_at`, `updated_at`
 - Dynamic key-value fields (any FIELD=VALUE pairs)
 - Timestamped notes attached to each person
+
+## Project Docs
+
+- Release process: [docs/RELEASING.md](docs/RELEASING.md)
+- Agent workflow notes: [AGENTS.md](AGENTS.md)
