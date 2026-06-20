@@ -253,17 +253,7 @@ impl Database {
         Ok(notes)
     }
 
-    pub fn list_people_with_note_counts(
-        &self,
-        recent: bool,
-        limit: Option<usize>,
-    ) -> Result<Vec<ListedPerson>> {
-        let inner_order_by = if recent { "updated_at DESC" } else { "name" };
-        let outer_order_by = if recent {
-            "p.updated_at DESC"
-        } else {
-            "p.name"
-        };
+    pub fn list_people_with_note_counts(&self, limit: Option<usize>) -> Result<Vec<ListedPerson>> {
         let limit_clause = limit.map(|l| format!("LIMIT {}", l)).unwrap_or_default();
 
         let sql = format!(
@@ -277,12 +267,12 @@ impl Database {
              FROM (
                 SELECT id, name, fields, created_at, updated_at
                 FROM people
-                ORDER BY {} {}
+                ORDER BY updated_at DESC {}
              ) p
              LEFT JOIN notes n ON n.person_id = p.id
              GROUP BY p.id, p.name, p.fields, p.created_at, p.updated_at
-             ORDER BY {}",
-            inner_order_by, limit_clause, outer_order_by
+             ORDER BY p.updated_at DESC",
+            limit_clause
         );
 
         let mut stmt = self.conn.prepare(&sql)?;
@@ -599,18 +589,20 @@ mod tests {
     }
 
     #[test]
-    fn test_list_people_with_note_counts_sorts_by_name() {
+    fn test_list_people_with_note_counts_sorts_by_updated_at() {
         let (db, _temp) = create_test_db();
-        db.add_person("Charlie", HashMap::new()).unwrap();
-        db.add_person("Alice", HashMap::new()).unwrap();
-        db.add_person("Bob", HashMap::new()).unwrap();
+        let charlie = db.add_person("Charlie", HashMap::new()).unwrap();
+        let alice = db.add_person("Alice", HashMap::new()).unwrap();
+        let bob = db.add_person("Bob", HashMap::new()).unwrap();
 
-        let people = db.list_people_with_note_counts(false, None).unwrap();
+        db.add_note(alice.id, "Most recent").unwrap();
+
+        let people = db.list_people_with_note_counts(None).unwrap();
         assert_eq!(people.len(), 3);
-        // Should be sorted by name
         assert_eq!(people[0].person.name, "Alice");
-        assert_eq!(people[1].person.name, "Bob");
-        assert_eq!(people[2].person.name, "Charlie");
+        assert_eq!(people[0].person.id, alice.id);
+        assert!(people.iter().any(|listed| listed.person.id == bob.id));
+        assert!(people.iter().any(|listed| listed.person.id == charlie.id));
     }
 
     #[test]
@@ -620,7 +612,7 @@ mod tests {
         db.add_person("Bob", HashMap::new()).unwrap();
         db.add_person("Charlie", HashMap::new()).unwrap();
 
-        let people = db.list_people_with_note_counts(false, Some(2)).unwrap();
+        let people = db.list_people_with_note_counts(Some(2)).unwrap();
         assert_eq!(people.len(), 2);
     }
 
@@ -633,7 +625,7 @@ mod tests {
         db.add_note(alice.id, "First").unwrap();
         db.add_note(alice.id, "Second").unwrap();
 
-        let people = db.list_people_with_note_counts(false, None).unwrap();
+        let people = db.list_people_with_note_counts(None).unwrap();
 
         assert_eq!(people.len(), 2);
         assert_eq!(people[0].person.name, "Alice");

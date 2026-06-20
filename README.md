@@ -39,7 +39,7 @@ rm ~/.wsw.db
 | `wsw set <NAME> <FIELD=VALUE>...` | Update/add fields |
 | `wsw note <NAME> <CONTENT>` | Add a timestamped note |
 | `wsw log <NAME>` | View notes/history |
-| `wsw list` | List all people with note counts (supports `--recent`, `--limit`) |
+| `wsw list` | List all people with note counts, recently updated first (supports `--limit`) |
 | `wsw search <QUERY>` | Search names, fields, and notes (supports `-f <FIELD>` and `-f notes`) |
 | `wsw rm <NAME>` | Remove person (or `--field <FIELD>` to remove field) |
 

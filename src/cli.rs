@@ -91,10 +91,6 @@ pub enum Commands {
 
     /// List all people
     List {
-        /// Show recently updated first
-        #[arg(long)]
-        recent: bool,
-
         /// Limit number of results
         #[arg(short, long)]
         limit: Option<usize>,

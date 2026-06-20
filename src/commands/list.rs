@@ -2,8 +2,8 @@ use crate::db::Database;
 use crate::errors::Result;
 use colored::Colorize;
 
-pub fn run(db: &Database, recent: bool, limit: Option<usize>, json: bool) -> Result<()> {
-    let people = db.list_people_with_note_counts(recent, limit)?;
+pub fn run(db: &Database, limit: Option<usize>, json: bool) -> Result<()> {
+    let people = db.list_people_with_note_counts(limit)?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&people).unwrap());

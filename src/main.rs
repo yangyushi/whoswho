@@ -44,12 +44,8 @@ fn run() -> Result<()> {
             reject_root_json(cli.json)?;
             commands::log::run(&db, name, id, limit)?;
         }
-        Some(Commands::List {
-            recent,
-            limit,
-            json,
-        }) => {
-            commands::list::run(&db, recent, limit, json || cli.json)?;
+        Some(Commands::List { limit, json }) => {
+            commands::list::run(&db, limit, json || cli.json)?;
         }
         Some(Commands::Search { query, field, json }) => {
             commands::search::run(&db, query, field, json || cli.json)?;

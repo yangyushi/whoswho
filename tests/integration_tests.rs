@@ -37,6 +37,7 @@ fn test_command_help_only_shows_applicable_options() {
         .success()
         .stdout(predicate::str::contains("[NAME]").not())
         .stdout(predicate::str::contains("--json"))
+        .stdout(predicate::str::contains("--recent").not())
         .stdout(predicate::str::contains("--yes").not());
 
     let mut cmd = wsw_cmd();
@@ -206,6 +207,34 @@ fn test_list_people() {
         .success()
         .stdout(predicate::str::contains("Alice"))
         .stdout(predicate::str::contains("Bob"));
+}
+
+#[test]
+fn test_list_defaults_to_recently_updated_first() {
+    let (db_path, _temp) = temp_db_arg();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "add", "Older"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "add", "Newer"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "note", "Older", "Refresh updated time"]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.env("NO_COLOR", "1");
+    cmd.args(["--db", &db_path, "list"]);
+    let output = cmd.output().unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let older_index = stdout.find("Older").unwrap();
+    let newer_index = stdout.find("Newer").unwrap();
+    assert!(older_index < newer_index);
 }
 
 #[test]
