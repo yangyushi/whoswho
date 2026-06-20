@@ -6,6 +6,8 @@ The format follows Keep a Changelog, and this project uses Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-20
+
 ### Added
 - Quick lookup now accepts a numeric person ID, for example `wsw 58`.
 
