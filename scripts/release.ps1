@@ -92,7 +92,7 @@ Run-Native cargo @("test")
 Run-Native git @("diff", "--check")
 
 if (-not $NoCommit) {
-    Run-Native git @("add", "Cargo.toml", "Cargo.lock", "CHANGELOG.md")
+    Run-Native git @("add", "Cargo.toml", "CHANGELOG.md")
     Run-Native git @("commit", "-m", "release $Version")
 }
 
