@@ -1,5 +1,5 @@
 use crate::errors::{Result, WswError};
-use crate::models::{Note, Person, PersonUpdate};
+use crate::models::{ListedPerson, Note, Person, PersonUpdate};
 use chrono::Local;
 use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashMap;
@@ -211,15 +211,6 @@ impl Database {
         })
     }
 
-    pub fn count_notes(&self, person_id: i64) -> Result<usize> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM notes WHERE person_id = ?1",
-            [person_id],
-            |row| row.get(0),
-        )?;
-        Ok(count as usize)
-    }
-
     pub fn get_all_notes(&self, person_id: i64) -> Result<Vec<Note>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, person_id, content, created_at FROM notes WHERE person_id = ?1 ORDER BY created_at DESC"
@@ -262,17 +253,39 @@ impl Database {
         Ok(notes)
     }
 
-    pub fn list_people(&self, recent: bool, limit: Option<usize>) -> Result<Vec<Person>> {
-        let order_by = if recent { "updated_at DESC" } else { "name" };
+    pub fn list_people_with_note_counts(
+        &self,
+        recent: bool,
+        limit: Option<usize>,
+    ) -> Result<Vec<ListedPerson>> {
+        let inner_order_by = if recent { "updated_at DESC" } else { "name" };
+        let outer_order_by = if recent {
+            "p.updated_at DESC"
+        } else {
+            "p.name"
+        };
         let limit_clause = limit.map(|l| format!("LIMIT {}", l)).unwrap_or_default();
 
         let sql = format!(
-            "SELECT id, name, fields, created_at, updated_at FROM people ORDER BY {} {}",
-            order_by, limit_clause
+            "SELECT
+                p.id,
+                p.name,
+                p.fields,
+                p.created_at,
+                p.updated_at,
+                COUNT(n.id) AS note_count
+             FROM (
+                SELECT id, name, fields, created_at, updated_at
+                FROM people
+                ORDER BY {} {}
+             ) p
+             LEFT JOIN notes n ON n.person_id = p.id
+             GROUP BY p.id, p.name, p.fields, p.created_at, p.updated_at
+             ORDER BY {}",
+            inner_order_by, limit_clause, outer_order_by
         );
 
         let mut stmt = self.conn.prepare(&sql)?;
-
         let rows = stmt.query_map([], |row| {
             let fields_json: String = row.get(2)?;
             let fields: HashMap<String, String> =
@@ -283,13 +296,17 @@ impl Database {
                         Box::new(e),
                     )
                 })?;
+            let note_count: i64 = row.get(5)?;
 
-            Ok(Person {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                fields,
-                created_at: row.get(3)?,
-                updated_at: row.get(4)?,
+            Ok(ListedPerson {
+                person: Person {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    fields,
+                    created_at: row.get(3)?,
+                    updated_at: row.get(4)?,
+                },
+                note_count: note_count as usize,
             })
         })?;
 
@@ -582,29 +599,48 @@ mod tests {
     }
 
     #[test]
-    fn test_list_people() {
+    fn test_list_people_with_note_counts_sorts_by_name() {
         let (db, _temp) = create_test_db();
         db.add_person("Charlie", HashMap::new()).unwrap();
         db.add_person("Alice", HashMap::new()).unwrap();
         db.add_person("Bob", HashMap::new()).unwrap();
 
-        let people = db.list_people(false, None).unwrap();
+        let people = db.list_people_with_note_counts(false, None).unwrap();
         assert_eq!(people.len(), 3);
         // Should be sorted by name
-        assert_eq!(people[0].name, "Alice");
-        assert_eq!(people[1].name, "Bob");
-        assert_eq!(people[2].name, "Charlie");
+        assert_eq!(people[0].person.name, "Alice");
+        assert_eq!(people[1].person.name, "Bob");
+        assert_eq!(people[2].person.name, "Charlie");
     }
 
     #[test]
-    fn test_list_people_with_limit() {
+    fn test_list_people_with_note_counts_limit() {
         let (db, _temp) = create_test_db();
         db.add_person("Alice", HashMap::new()).unwrap();
         db.add_person("Bob", HashMap::new()).unwrap();
         db.add_person("Charlie", HashMap::new()).unwrap();
 
-        let people = db.list_people(false, Some(2)).unwrap();
+        let people = db.list_people_with_note_counts(false, Some(2)).unwrap();
         assert_eq!(people.len(), 2);
+    }
+
+    #[test]
+    fn test_list_people_with_note_counts() {
+        let (db, _temp) = create_test_db();
+        let alice = db.add_person("Alice", HashMap::new()).unwrap();
+        let bob = db.add_person("Bob", HashMap::new()).unwrap();
+
+        db.add_note(alice.id, "First").unwrap();
+        db.add_note(alice.id, "Second").unwrap();
+
+        let people = db.list_people_with_note_counts(false, None).unwrap();
+
+        assert_eq!(people.len(), 2);
+        assert_eq!(people[0].person.name, "Alice");
+        assert_eq!(people[0].note_count, 2);
+        assert_eq!(people[1].person.name, "Bob");
+        assert_eq!(people[1].person.id, bob.id);
+        assert_eq!(people[1].note_count, 0);
     }
 
     #[test]

@@ -65,7 +65,8 @@ fn run() -> Result<()> {
         }
         None => {
             if let Some(name) = cli.name {
-                commands::get::run(&db, name, false, cli.json)?;
+                let use_id = name.parse::<i64>().is_ok();
+                commands::get::run(&db, name, use_id, cli.json)?;
             } else {
                 let mut cmd = Cli::command();
                 cmd.print_help()?;

@@ -20,6 +20,13 @@ pub struct Note {
     pub created_at: DateTime<Local>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListedPerson {
+    #[serde(flatten)]
+    pub person: Person,
+    pub note_count: usize,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct PersonUpdate {
     pub name: Option<String>,

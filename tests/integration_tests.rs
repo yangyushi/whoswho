@@ -133,6 +133,28 @@ fn test_get_person_shorthand() {
 }
 
 #[test]
+fn test_get_person_shorthand_by_id() {
+    let (db_path, _temp) = temp_db_arg();
+
+    let mut cmd = wsw_cmd();
+    cmd.args([
+        "--db",
+        &db_path,
+        "add",
+        "Numeric Lookup",
+        "email=numeric@example.com",
+    ]);
+    cmd.assert().success();
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "1"]);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Numeric Lookup"))
+        .stdout(predicate::str::contains("numeric@example.com"));
+}
+
+#[test]
 fn test_set_person() {
     let (db_path, _temp) = temp_db_arg();
 
@@ -208,6 +230,50 @@ fn test_list_shows_note_counts() {
         .success()
         .stdout(predicate::str::contains("Alice"))
         .stdout(predicate::str::contains("2 notes"));
+}
+
+#[test]
+fn test_list_output_aligns_columns() {
+    let (db_path, _temp) = temp_db_arg();
+    let names = [
+        "李丹静",
+        "杨悦羽霄",
+        "Person03",
+        "Person04",
+        "Person05",
+        "Person06",
+        "Person07",
+        "Person08",
+        "Person09",
+        "张超雄",
+    ];
+
+    for name in names {
+        let mut cmd = wsw_cmd();
+        cmd.args(["--db", &db_path, "add", name]);
+        cmd.assert().success();
+    }
+
+    let mut cmd = wsw_cmd();
+    cmd.args(["--db", &db_path, "note", "杨悦羽霄", "One note"]);
+    cmd.assert().success();
+
+    for index in 1..=10 {
+        let mut cmd = wsw_cmd();
+        cmd.args(["--db", &db_path, "note", "张超雄", &format!("Note {index}")]);
+        cmd.assert().success();
+    }
+
+    let mut cmd = wsw_cmd();
+    cmd.env("NO_COLOR", "1");
+    cmd.args(["--db", &db_path, "list"]);
+    let output = cmd.output().unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("[ 1] 李丹静   - 0 notes  - updated"));
+    assert!(stdout.contains("[ 2] 杨悦羽霄 - 1 note   - updated"));
+    assert!(stdout.contains("[10] 张超雄   - 10 notes - updated"));
 }
 
 #[test]

@@ -6,6 +6,13 @@ The format follows Keep a Changelog, and this project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+- Quick lookup now accepts a numeric person ID, for example `wsw 58`.
+
+### Changed
+- `wsw list` now aligns ID, name, and note-count columns based on the current result set.
+- `wsw list` now fetches note counts with the people list instead of running one count query per person.
+
 ## [0.2.1] - 2026-06-14
 
 ### Fixed
